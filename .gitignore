@@ -1,0 +1,17 @@
+# Специфичные файлы IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Файлы сборки (если используете Maven или Gradle)
+target/
+build/
+
+# Системные файлы операционных систем
+.DS_Store
+Thumbs.db
+
+# Логи и временные файлы
+*.log
