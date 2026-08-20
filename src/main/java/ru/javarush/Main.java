@@ -23,6 +23,9 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.testcontainers.containers.DockerComposeContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
+import java.io.File;
 
 import static java.util.Objects.nonNull;
 
@@ -166,27 +169,47 @@ public class Main {
         }
     }
 
+    public static DockerComposeContainer<?> environment =
+            new DockerComposeContainer<>(new File("docker-compose.yml"))
+                    .withExposedService("mysql-db", 3306, Wait.forListeningPort())
+                    .withExposedService("redis-cache", 6379, Wait.forListeningPort());
+
     public static void main(String[] args) {
+        System.out.println("🚀 Автоматический запуск Docker контейнеров...");
+        try {
+            environment.start();
+            System.out.println("✅ Инфраструктура готова! Начинается выполнение кода...\n");
+            Main main = new Main();
+            List<City> allCities = main.fetchData(main);
+            List<CityCountry> preparedData = main.transformData(allCities);
+            main.pushToRedis(preparedData);
 
-        Main main = new Main();
-        List<City> allCities = main.fetchData(main);
-        List<CityCountry> preparedData = main.transformData(allCities);
-        main.pushToRedis(preparedData);
+            main.sessionFactory.getCurrentSession().close();
+            List<Integer> ids = List.of(3, 2545, 123, 4, 189, 89, 3458, 1189, 10, 102);
 
-        main.sessionFactory.getCurrentSession().close();
-        List<Integer> ids = List.of(3, 2545, 123, 4, 189, 89, 3458, 1189, 10, 102);
+            long startRedis = System.currentTimeMillis();
+            main.testRedisData(ids);
+            long stopRedis = System.currentTimeMillis();
 
-        long startRedis = System.currentTimeMillis();
-        main.testRedisData(ids);
-        long stopRedis = System.currentTimeMillis();
+            long startMysql = System.currentTimeMillis();
+            main.testMysqlData(ids);
+            long stopMysql = System.currentTimeMillis();
 
-        long startMysql = System.currentTimeMillis();
-        main.testMysqlData(ids);
-        long stopMysql = System.currentTimeMillis();
+            System.out.printf("%s:\t%d ms\n", "Redis", (stopRedis - startRedis));
+            System.out.printf("%s:\t%d ms\n", "MySQL", (stopMysql - startMysql));
 
-        System.out.printf("%s:\t%d ms\n", "Redis", (stopRedis - startRedis));
-        System.out.printf("%s:\t%d ms\n", "MySQL", (stopMysql - startMysql));
+            main.shutdown();
+            // ====================================================================
 
-        main.shutdown();
+        } catch (Exception e) {
+            System.err.println("Ошибка во время выполнения: " + e.getMessage());
+            e.printStackTrace();
+        } finally {
+            System.out.println("\n🛑 Автоматическая остановка и очистка Docker контейнеров...");
+            environment.stop();
+            System.out.println("✨ Система очищена.");
+        }
     }
-}
+
+    }
+
